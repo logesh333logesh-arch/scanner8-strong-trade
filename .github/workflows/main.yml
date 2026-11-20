@@ -1,0 +1,42 @@
+name: Scanner 8 - Strong Trade Scanner
+
+on:
+  schedule:
+    - cron: "*/5 4-9 * * 1-5"   # every 5 min, 09:30-15:25 IST, Mon-Fri
+  workflow_dispatch:
+
+concurrency:
+  group: scanner8
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: IST date
+        id: d
+        run: echo "day=$(TZ=Asia/Kolkata date +%F)" >> "$GITHUB_OUTPUT"
+
+      # keeps history cache + "already alerted" state between runs of the same day
+      - uses: actions/cache@v4
+        with:
+          path: cache
+          key: s8-${{ steps.d.outputs.day }}-${{ github.run_id }}
+          restore-keys: s8-${{ steps.d.outputs.day }}-
+
+      - name: Scan
+        run: python scanner8_strong_trade.py --debug
+        env:
+          UPSTOX_ACCESS_TOKEN: ${{ secrets.UPSTOX_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
