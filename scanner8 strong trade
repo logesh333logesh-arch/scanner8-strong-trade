@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""
+Scanner 8 - TCR Strong Trade Scanner (all F&O stocks, Upstox data, Telegram alerts)
+
+Runs the same trend / move / reversal-risk / ADR-range engine as the TradingView
+table, but adds strict extra filters. When EVERY rule passes for a stock it sends
+one Telegram message with: direction, MAX UP / MAX DN levels, SL, target and a
+ready option trade plan (strike picked from the live option chain, premium SL and
+target estimated from delta/gamma).
+
+Usage:
+  python scanner8_strong_trade.py              # normal run (respects time window)
+  python scanner8_strong_trade.py --force      # ignore time window / duplicates
+  python scanner8_strong_trade.py --debug      # print per-stage funnel
+  python scanner8_strong_trade.py --selftest   # offline logic test, no API needed
+"""
+import os, sys, json, gzip, math, time, pickle, argparse, datetime as dt
+from pathlib import Path
+from zoneinfo import ZoneInfo
+import numpy as np
+import pandas as pd
+import requests
+
+IST = ZoneInfo("Asia/Kolkata")
+BASE = "https://api.upstox.com"
+MASTER_URL = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz"
+NIFTY_KEY = "NSE_INDEX|Nifty 50"
+CACHE = Path(os.environ.get("S8_CACHE_DIR", "cache"))
+
+# ----------------------------------------------------------------------------
+# SETTINGS - every number here can be tuned
+# ----------------------------------------------------------------------------
+CFG = dict(
+    tf_min=5,
+    # trend engine (same as the indicator)
+    st_len=10, st_mult=3.0, piv_len=5, trend_thr=3, conf_bars=2,
